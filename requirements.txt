@@ -6,3 +6,4 @@ torchvision
 tqdm
 scikit-learn
 matplotlib
+pandas
