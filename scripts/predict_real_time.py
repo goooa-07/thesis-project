@@ -55,25 +55,24 @@ def resample_to_T(seq, T_target):
     out = (1 - w)[:, None, None] * seq[idx0] + w[:, None, None] * seq[idx1]
     return out.astype(np.float32)
 
-def normalize_like_training(seq_xy):
+def normalize_like_training(seq):
     """
-    IMPORTANT: Many keypoint pipelines normalize by:
-    - subtract wrist (joint 0)
-    - divide by hand scale (e.g., distance wrist->middle_mcp joint 9)
-    If your training used this, real-time MUST match.
-
-    This version does a safe standard normalization:
-    center by wrist and scale by mean bone length.
+    seq: (T,21,2) raw MediaPipe normalized coords (0-1)
+    Apply same normalization as dataset creation.
     """
-    seq = seq_xy.copy()  # (T,21,2)
 
-    # center by wrist (joint 0)
-    wrist = seq[:, 0:1, :]  # (T,1,2)
+    seq = seq.copy()
+
+    # 1️⃣ subtract wrist (joint 0)
+    wrist = seq[:, 0:1, :]      # (T,1,2)
     seq = seq - wrist
 
-    # scale by average distance from wrist to all joints (avoid divide by zero)
-    scale = np.linalg.norm(seq, axis=2).mean(axis=1)  # (T,)
+    # 2️⃣ scale by hand size
+    # Use distance wrist -> middle finger MCP (joint 9)
+    ref = seq[:, 9, :]          # (T,2)
+    scale = np.linalg.norm(ref, axis=1)  # (T,)
     scale = np.maximum(scale, 1e-6)
+
     seq = seq / scale[:, None, None]
 
     return seq.astype(np.float32)
@@ -134,7 +133,7 @@ def main():
         ok, frame = cap.read()
         if not ok:
             break
-
+        frame = cv2.flip(frame, 1)
         # If your training videos were mirrored, uncomment next line:
         # frame = cv2.flip(frame, 1)
 
